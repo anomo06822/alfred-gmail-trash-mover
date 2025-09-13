@@ -12,18 +12,22 @@ class FakeRequest:
 
 
 class FakeMessages:
-    def __init__(self, pages, snippets=None, batch_calls=None):
+    def __init__(self, pages, snippets=None, batch_calls=None, headers=None):
         self.pages = pages
         self.snippets = snippets or {}
         self.batch_calls = batch_calls if batch_calls is not None else []
+        self.headers = headers or {}
 
     def list(self, userId=None, q=None, pageToken=None, maxResults=None):  # noqa: N802
         # Return page by token
         page = self.pages.get(pageToken or "page1")
         return FakeRequest(page)
 
-    def get(self, userId=None, id=None, format=None):  # noqa: N802, A002
+    def get(self, userId=None, id=None, format=None, metadataHeaders=None):  # noqa: N802, A002
         res = {"id": id, "snippet": self.snippets.get(id, "")}
+        # If metadata requested, return payload headers if available
+        if format == "metadata" and id in self.headers:
+            res["payload"] = {"headers": self.headers[id]}
         return FakeRequest(res)
 
     def batchModify(self, userId=None, body=None):  # noqa: N802
@@ -84,6 +88,18 @@ class GmailOpsTest(unittest.TestCase):
         res = gmail_ops.get_snippets(svc, "me", ["m1", "m2", "m3", "m4"], sample=3)
         self.assertEqual(len(res), 3)
         self.assertTrue(res[0].startswith("[m1] "))
+
+    def test_count_unique_senders(self):
+        headers = {
+            "a1": [{"name": "From", "value": "Foo Bar <foo@example.com>"}],
+            "a2": [{"name": "From", "value": "foo@example.com"}],
+            "a3": [{"name": "From", "value": "Baz <baz@example.com>"}],
+        }
+        fm = FakeMessages(pages={}, headers=headers)
+        svc = FakeService(fm)
+        pairs = gmail_ops.count_unique_senders(svc, "me", ["a1", "a2", "a3"])
+        self.assertEqual(pairs[0], ("foo@example.com", 2))
+        self.assertEqual(pairs[1], ("baz@example.com", 1))
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ try:
         search_message_ids,
         move_to_trash_batch,
         get_snippets,
+        count_unique_senders,
         BATCH_SIZE,
     )
     from .util import setup_logger, format_summary, resolve_paths
@@ -20,6 +21,7 @@ except Exception:  # pragma: no cover - fallback when run as a file
         search_message_ids,
         move_to_trash_batch,
         get_snippets,
+        count_unique_senders,
         BATCH_SIZE,
     )
     from util import setup_logger, format_summary, resolve_paths  # type: ignore
@@ -35,6 +37,7 @@ def parse_args(argv: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(description="Alfred Gmail Trash Mover")
     parser.add_argument("--query", required=True, help="Gmail 搜尋語法")
     parser.add_argument("--dry-run", action="store_true", help="乾跑，不進行實際搬移")
+    parser.add_argument("--list-from", action="store_true", help="列出命中郵件的唯一發件者與次數")
     parser.add_argument("--limit", type=int, default=None, help="限制處理筆數")
     parser.add_argument("--log-level", choices=["INFO", "DEBUG"], default="INFO")
     parser.add_argument("--credentials-path", default=None)
@@ -65,6 +68,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         ids = search_message_ids(service, "me", query, args.limit)
         count = len(ids)
+        if args.list_from:
+            pairs = count_unique_senders(service, "me", ids)
+            lines = [f"發件者統計（共 {len(pairs)} 個）："]
+            for email, n in pairs:
+                lines.append(f"- {email}: {n}")
+            print("\n".join(lines))
+            return 0
         if args.dry_run:
             samples = get_snippets(service, "me", ids, sample=3)
             summary = format_summary(count, dry=True)

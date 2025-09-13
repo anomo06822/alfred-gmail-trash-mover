@@ -42,9 +42,15 @@ python src/gmail_trash.py --query "older_than:6m label:promotions" --dry-run
 python src/gmail_trash.py --query "label:promotions older_than:6m" --limit 500
 ```
 
+- 僅列出發件者統計（不搬移）：
+```
+python src/gmail_trash.py --query "label:promotions older_than:6m" --list-from
+```
+
 CLI 參數：
 - `--query`：必填，Gmail 查詢語法
 - `--dry-run`：乾跑模式
+- `--list-from`：列出命中郵件的唯一發件者與次數（僅檢視，不搬移）
 - `--limit N`：限制處理筆數（測試用）
 - `--log-level INFO|DEBUG`
 

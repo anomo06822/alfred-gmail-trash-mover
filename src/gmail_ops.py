@@ -59,3 +59,51 @@ def get_snippets(service, user_id: str, ids: Sequence[str], sample: int = 3) -> 
             snippet = snippet[:200] + "…"
         result.append(f"[{mid}] {snippet}")
     return result
+
+
+def _extract_from_header(payload_headers: list[dict]) -> str | None:
+    for h in payload_headers:
+        if h.get("name", "").lower() == "from":
+            return h.get("value")
+    return None
+
+
+def get_from_addresses(service, user_id: str, ids: Sequence[str]) -> List[str]:
+    addrs: List[str] = []
+    for mid in ids:
+        res = (
+            service.users()
+            .messages()
+            .get(
+                userId=user_id,
+                id=mid,
+                format="metadata",
+                metadataHeaders=["From"],
+            )
+            .execute()
+        )
+        payload = res.get("payload", {})
+        headers = payload.get("headers", [])
+        from_raw = _extract_from_header(headers)
+        if from_raw:
+            addrs.append(from_raw)
+    return addrs
+
+
+def count_unique_senders(service, user_id: str, ids: Sequence[str]) -> list[tuple[str, int]]:
+    from email.utils import getaddresses
+    from collections import Counter
+
+    raw_list = get_from_addresses(service, user_id, ids)
+    parsed = []
+    for raw in raw_list:
+        # Extract just the email part
+        addrs = getaddresses([raw])
+        if not addrs:
+            continue
+        _, email_addr = addrs[0]
+        if email_addr:
+            parsed.append(email_addr.lower())
+    counts = Counter(parsed)
+    # Return sorted by count desc, then email asc
+    return sorted(counts.items(), key=lambda x: (-x[1], x[0]))
