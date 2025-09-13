@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>bundleid</key>
+    <string>com.example.gmailtrashmover</string>
+    <key>category</key>
+    <string>Tools</string>
+    <key>connections</key>
+    <dict>
+      <key>kw-gdel</key>
+      <array>
+        <dict>
+          <key>destinationuid</key>
+          <string>run-gdel</string>
+          <key>modifiers</key>
+          <integer>0</integer>
+          <key>modifiersubtext</key>
+          <string></string>
+          <key>vitoclose</key>
+          <false/>
+        </dict>
+      </array>
+      <key>run-gdel</key>
+      <array>
+        <dict>
+          <key>destinationuid</key>
+          <string>notif-gdel</string>
+          <key>modifiers</key>
+          <integer>0</integer>
+          <key>modifiersubtext</key>
+          <string></string>
+          <key>vitoclose</key>
+          <false/>
+        </dict>
+      </array>
+      <key>kw-gdel-dry</key>
+      <array>
+        <dict>
+          <key>destinationuid</key>
+          <string>run-gdel-dry</string>
+          <key>modifiers</key>
+          <integer>0</integer>
+          <key>modifiersubtext</key>
+          <string></string>
+          <key>vitoclose</key>
+          <false/>
+        </dict>
+      </array>
+      <key>run-gdel-dry</key>
+      <array>
+        <dict>
+          <key>destinationuid</key>
+          <string>notif-gdel-dry</string>
+          <key>modifiers</key>
+          <integer>0</integer>
+          <key>modifiersubtext</key>
+          <string></string>
+          <key>vitoclose</key>
+          <false/>
+        </dict>
+      </array>
+    </dict>
+    <key>createdby</key>
+    <string>Alfred Gmail Trash Mover</string>
+    <key>description</key>
+    <string>Move Gmail messages to TRASH via query</string>
+    <key>name</key>
+    <string>Gmail Trash Mover</string>
+    <key>objects</key>
+    <array>
+      <dict>
+        <key>uid</key><string>kw-gdel</string>
+        <key>type</key><string>alfred.workflow.input.keyword</string>
+        <key>config</key>
+        <dict>
+          <key>argumenttype</key><integer>1</integer>
+          <key>keyword</key><string>gdel</string>
+          <key>subtext</key><string>Enter Gmail query</string>
+          <key>text</key><string>Gmail Trash Mover</string>
+          <key>withspace</key><true/>
+        </dict>
+      </dict>
+      <dict>
+        <key>uid</key><string>run-gdel</string>
+        <key>type</key><string>alfred.workflow.action.script</string>
+        <key>config</key>
+        <dict>
+          <key>concurrently</key><false/>
+          <key>script</key>
+          <string>/usr/bin/python3 "$PROJECT_DIR/src/gmail_trash.py" --query "{query}"</string>
+          <key>type</key><integer>1</integer>
+        </dict>
+      </dict>
+      <dict>
+        <key>uid</key><string>notif-gdel</string>
+        <key>type</key><string>alfred.workflow.output.notification</string>
+        <key>config</key>
+        <dict>
+          <key>text</key><string>{query}</string>
+          <key>title</key><string>Gmail Trash Mover</string>
+        </dict>
+      </dict>
+
+      <dict>
+        <key>uid</key><string>kw-gdel-dry</string>
+        <key>type</key><string>alfred.workflow.input.keyword</string>
+        <key>config</key>
+        <dict>
+          <key>argumenttype</key><integer>1</integer>
+          <key>keyword</key><string>gdel-dry</string>
+          <key>subtext</key><string>Enter Gmail query (dry run)</string>
+          <key>text</key><string>Gmail Trash Mover (Dry)</string>
+          <key>withspace</key><true/>
+        </dict>
+      </dict>
+      <dict>
+        <key>uid</key><string>run-gdel-dry</string>
+        <key>type</key><string>alfred.workflow.action.script</string>
+        <key>config</key>
+        <dict>
+          <key>concurrently</key><false/>
+          <key>script</key>
+          <string>/usr/bin/python3 "$PROJECT_DIR/src/gmail_trash.py" --query "{query}" --dry-run</string>
+          <key>type</key><integer>1</integer>
+        </dict>
+      </dict>
+      <dict>
+        <key>uid</key><string>notif-gdel-dry</string>
+        <key>type</key><string>alfred.workflow.output.notification</string>
+        <key>config</key>
+        <dict>
+          <key>text</key><string>{query}</string>
+          <key>title</key><string>Gmail Trash Mover (Dry)</string>
+        </dict>
+      </dict>
+    </array>
+    <key>variables</key>
+    <dict>
+      <key>PROJECT_DIR</key>
+      <string>/absolute/path/to/alfred-gmail-trash-mover</string>
+    </dict>
+  </dict>
+</plist>
+
