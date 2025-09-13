@@ -133,6 +133,64 @@ def add_star_label_batch(service, user_id: str, ids: Sequence[str]) -> int:
     return total
 
 
+def ensure_label(service, user_id: str, name: str) -> str:
+    labels = service.users().labels().list(userId=user_id).execute().get("labels", [])
+    for lb in labels:
+        if lb.get("name") == name:
+            return lb["id"]
+    body = {
+        "name": name,
+        "labelListVisibility": "labelShow",
+        "messageListVisibility": "show",
+    }
+    created = service.users().labels().create(userId=user_id, body=body).execute()
+    return created["id"]
+
+
+def add_label_batch(service, user_id: str, ids: Sequence[str], label_id: str) -> int:
+    total = 0
+    for i in range(0, len(ids), BATCH_SIZE):
+        chunk = ids[i : i + BATCH_SIZE]
+        if not chunk:
+            continue
+        body = {"addLabelIds": [label_id], "ids": list(chunk)}
+        service.users().messages().batchModify(userId=user_id, body=body).execute()
+        total += len(chunk)
+    return total
+
+
+def classify_ids(metas: Sequence[dict]) -> dict:
+    res = {"starred": [], "important": [], "sensitive": [], "other": []}
+    for m in metas:
+        mid = m.get("id")
+        if not mid:
+            continue
+        label_ids = set(m.get("labelIds", []))
+        flagged_sensitive = False
+        snippet = (m.get("snippet") or "").lower()
+        subject = ""
+        payload = m.get("payload", {})
+        for h in payload.get("headers", []):
+            if h.get("name", "").lower() == "subject":
+                subject = h.get("value", "").lower()
+                break
+        text = f"{subject} {snippet}"
+        for kw in ("password", "密碼", "驗證碼", "verification code", "security code", "otp", "2fa", "帳號", "reset password", "token"):
+            if kw in text:
+                flagged_sensitive = True
+                break
+
+        if "STARRED" in label_ids:
+            res["starred"].append(mid)
+        elif "IMPORTANT" in label_ids:
+            res["important"].append(mid)
+        elif flagged_sensitive:
+            res["sensitive"].append(mid)
+        else:
+            res["other"].append(mid)
+    return res
+
+
 def filter_ids_for_trash(
     metas: Sequence[dict],
     *,

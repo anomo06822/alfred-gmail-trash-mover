@@ -53,6 +53,10 @@ CLI 參數：
 - `--list-from`：列出命中郵件的唯一發件者與次數（僅檢視，不搬移）
 - `--limit N`：限制處理筆數（測試用）
 - `--log-level INFO|DEBUG`
+- `--important-label NAME`：將被跳過的（加星/重要/敏感）郵件加上此標籤（預設 `AGM-Important`）
+- `--no-skip-starred`：包含加星郵件（預設跳過並加上 `--important-label`）
+- `--no-skip-sensitive`：包含敏感關鍵字郵件（預設跳過並加上 `--important-label`）
+- `--no-mark-important-star`：不要自動將 Gmail 判定的 `IMPORTANT` 郵件加星（預設會加星）；不影響 `--important-label` 行為
 
 結束碼：
 - `0` 成功

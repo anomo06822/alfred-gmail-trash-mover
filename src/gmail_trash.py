@@ -46,6 +46,7 @@ def parse_args(argv: Optional[list[str]] = None):
     parser.add_argument("--no-skip-starred", dest="skip_starred", action="store_false", help="包含已加星郵件（預設跳過）")
     parser.add_argument("--no-skip-sensitive", dest="skip_sensitive", action="store_false", help="包含可能含帳密/驗證碼等敏感字樣（預設跳過）")
     parser.add_argument("--no-mark-important-star", dest="mark_important_star", action="store_false", help="不要將重要郵件加星（預設會加星並跳過）")
+    parser.add_argument("--important-label", default="AGM-Important", help="將被跳過的（加星/重要/敏感）郵件加上此自訂標籤")
     parser.set_defaults(skip_starred=True, skip_sensitive=True, mark_important_star=True)
     return parser.parse_args(argv)
 
@@ -91,9 +92,23 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         # Fetch metadata and apply filters
         try:
-            from .gmail_ops import get_messages_metadata, filter_ids_for_trash, add_star_label_batch
+            from .gmail_ops import (
+                get_messages_metadata,
+                filter_ids_for_trash,
+                add_star_label_batch,
+                classify_ids,
+                ensure_label,
+                add_label_batch,
+            )
         except Exception:  # pragma: no cover
-            from gmail_ops import get_messages_metadata, filter_ids_for_trash, add_star_label_batch  # type: ignore
+            from gmail_ops import (  # type: ignore
+                get_messages_metadata,
+                filter_ids_for_trash,
+                add_star_label_batch,
+                classify_ids,
+                ensure_label,
+                add_label_batch,
+            )
 
         metas = get_messages_metadata(service, "me", ids, headers=["Subject", "From"])
 
@@ -109,6 +124,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             skip_important=True,
             skip_sensitive=args.skip_sensitive,
         )
+
+        # Label the skipped ones for later review
+        classified = classify_ids(metas)
+        to_label = set(classified.get("starred", [])) | set(classified.get("important", [])) | set(classified.get("sensitive", []))
+        if to_label:
+            label_id = ensure_label(service, "me", args.important_label)
+            add_label_batch(service, "me", list(to_label), label_id)
 
         moved = move_to_trash_batch(service, "me", trash_ids)
         limited = args.limit if args.limit is not None and args.limit < count else None
