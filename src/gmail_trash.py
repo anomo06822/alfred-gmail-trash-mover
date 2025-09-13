@@ -42,6 +42,11 @@ def parse_args(argv: Optional[list[str]] = None):
     parser.add_argument("--log-level", choices=["INFO", "DEBUG"], default="INFO")
     parser.add_argument("--credentials-path", default=None)
     parser.add_argument("--token-path", default=None)
+    # Filtering / safety options
+    parser.add_argument("--no-skip-starred", dest="skip_starred", action="store_false", help="包含已加星郵件（預設跳過）")
+    parser.add_argument("--no-skip-sensitive", dest="skip_sensitive", action="store_false", help="包含可能含帳密/驗證碼等敏感字樣（預設跳過）")
+    parser.add_argument("--no-mark-important-star", dest="mark_important_star", action="store_false", help="不要將重要郵件加星（預設會加星並跳過）")
+    parser.set_defaults(skip_starred=True, skip_sensitive=True, mark_important_star=True)
     return parser.parse_args(argv)
 
 
@@ -84,9 +89,31 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("\n".join(out))
             return 0
 
-        moved = move_to_trash_batch(service, "me", ids)
+        # Fetch metadata and apply filters
+        try:
+            from .gmail_ops import get_messages_metadata, filter_ids_for_trash, add_star_label_batch
+        except Exception:  # pragma: no cover
+            from gmail_ops import get_messages_metadata, filter_ids_for_trash, add_star_label_batch  # type: ignore
+
+        metas = get_messages_metadata(service, "me", ids, headers=["Subject", "From"])
+
+        # Star important ones, skip them from trash
+        if args.mark_important_star:
+            to_star = [m["id"] for m in metas if "IMPORTANT" in set(m.get("labelIds", [])) and "STARRED" not in set(m.get("labelIds", []))]
+            if to_star:
+                add_star_label_batch(service, "me", to_star)
+
+        trash_ids, skipped = filter_ids_for_trash(
+            metas,
+            skip_starred=args.skip_starred,
+            skip_important=True,
+            skip_sensitive=args.skip_sensitive,
+        )
+
+        moved = move_to_trash_batch(service, "me", trash_ids)
         limited = args.limit if args.limit is not None and args.limit < count else None
         print(format_summary(count, moved=moved, limited=limited, dry=False))
+        print(f"已跳過：加星 {skipped.get('starred',0)}、重要 {skipped.get('important',0)}、敏感 {skipped.get('sensitive',0)}")
         logger.debug(f"批次大小: {BATCH_SIZE}")
         return 0
     except Exception as e:

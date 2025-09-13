@@ -12,11 +12,12 @@ class FakeRequest:
 
 
 class FakeMessages:
-    def __init__(self, pages, snippets=None, batch_calls=None, headers=None):
+    def __init__(self, pages, snippets=None, batch_calls=None, headers=None, label_ids=None):
         self.pages = pages
         self.snippets = snippets or {}
         self.batch_calls = batch_calls if batch_calls is not None else []
         self.headers = headers or {}
+        self.label_ids = label_ids or {}
 
     def list(self, userId=None, q=None, pageToken=None, maxResults=None):  # noqa: N802
         # Return page by token
@@ -24,7 +25,7 @@ class FakeMessages:
         return FakeRequest(page)
 
     def get(self, userId=None, id=None, format=None, metadataHeaders=None):  # noqa: N802, A002
-        res = {"id": id, "snippet": self.snippets.get(id, "")}
+        res = {"id": id, "snippet": self.snippets.get(id, ""), "labelIds": self.label_ids.get(id, [])}
         # If metadata requested, return payload headers if available
         if format == "metadata" and id in self.headers:
             res["payload"] = {"headers": self.headers[id]}
@@ -100,6 +101,20 @@ class GmailOpsTest(unittest.TestCase):
         pairs = gmail_ops.count_unique_senders(svc, "me", ["a1", "a2", "a3"])
         self.assertEqual(pairs[0], ("foo@example.com", 2))
         self.assertEqual(pairs[1], ("baz@example.com", 1))
+
+    def test_filter_ids_for_trash(self):
+        from src.gmail_ops import filter_ids_for_trash
+        metas = [
+            {"id": "a", "labelIds": ["STARRED"], "snippet": "ok"},
+            {"id": "b", "labelIds": ["IMPORTANT"], "snippet": "ok"},
+            {"id": "c", "labelIds": [], "snippet": "your password reset"},
+            {"id": "d", "labelIds": [], "snippet": "promo"},
+        ]
+        trash, skipped = filter_ids_for_trash(metas)
+        self.assertEqual(trash, ["d"])  # only d passes
+        self.assertEqual(skipped["starred"], 1)
+        self.assertEqual(skipped["important"], 1)
+        self.assertEqual(skipped["sensitive"], 1)
 
 
 if __name__ == "__main__":

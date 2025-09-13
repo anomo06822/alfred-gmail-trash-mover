@@ -107,3 +107,81 @@ def count_unique_senders(service, user_id: str, ids: Sequence[str]) -> list[tupl
     counts = Counter(parsed)
     # Return sorted by count desc, then email asc
     return sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+
+
+def get_messages_metadata(service, user_id: str, ids: Sequence[str], headers: Sequence[str] | None = None) -> List[dict]:
+    headers = list(headers or ("From", "Subject"))
+    out: List[dict] = []
+    for mid in ids:
+        res = (
+            service.users()
+            .messages()
+            .get(userId=user_id, id=mid, format="metadata", metadataHeaders=headers)
+            .execute()
+        )
+        out.append(res)
+    return out
+
+
+def add_star_label_batch(service, user_id: str, ids: Sequence[str]) -> int:
+    total = 0
+    for i in range(0, len(ids), BATCH_SIZE):
+        chunk = ids[i : i + BATCH_SIZE]
+        body = {"addLabelIds": ["STARRED"], "ids": list(chunk)}
+        _ = service.users().messages().batchModify(userId=user_id, body=body).execute()
+        total += len(chunk)
+    return total
+
+
+def filter_ids_for_trash(
+    metas: Sequence[dict],
+    *,
+    skip_starred: bool = True,
+    skip_important: bool = True,
+    skip_sensitive: bool = True,
+    sensitive_keywords: Sequence[str] | None = None,
+) -> tuple[list[str], dict]:
+    sensitive_keywords = [
+        k.lower()
+        for k in (sensitive_keywords or (
+            "password",
+            "密碼",
+            "驗證碼",
+            "verification code",
+            "security code",
+            "otp",
+            "2fa",
+            "帳號",
+            "reset password",
+            "token",
+        ))
+    ]
+    trash_ids: list[str] = []
+    skipped = {"starred": 0, "important": 0, "sensitive": 0}
+
+    for m in metas:
+        mid = m.get("id")
+        if not mid:
+            continue
+        label_ids = set(m.get("labelIds", []))
+        if skip_starred and "STARRED" in label_ids:
+            skipped["starred"] += 1
+            continue
+        if skip_important and "IMPORTANT" in label_ids:
+            skipped["important"] += 1
+            continue
+        if skip_sensitive:
+            snippet = (m.get("snippet") or "").lower()
+            # Try subject if present
+            subject = ""
+            payload = m.get("payload", {})
+            for h in payload.get("headers", []):
+                if h.get("name", "").lower() == "subject":
+                    subject = h.get("value", "").lower()
+                    break
+            text = f"{subject} {snippet}"
+            if any(kw in text for kw in sensitive_keywords):
+                skipped["sensitive"] += 1
+                continue
+        trash_ids.append(mid)
+    return trash_ids, skipped
